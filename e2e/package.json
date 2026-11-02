@@ -1,0 +1,7 @@
+{
+  "name": "hibira-spring-boot-e2e",
+  "private": true,
+  "description": "Browser e2e for samples/chat: two users chat, see each other online and wave, through a Hibira server.",
+  "scripts": { "test": "node chat.e2e.cjs" },
+  "dependencies": { "playwright": "1.63.0", "pusher-js": "8.4.0" }
+}

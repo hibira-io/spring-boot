@@ -1,0 +1,9 @@
+target/
+.flattened-pom.xml
+*.iml
+.idea/
+.vscode/
+.DS_Store
+node_modules/
+e2e/*.png
+.env

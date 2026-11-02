@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spring Boot chat on Hibira</title>
+  <style>
+    :root { --bg: #f6f7f9; --card: #fff; --text: #16181d; --muted: #667085; --line: #e4e7ec; --accent: #4f46e5; --mine: #eef2ff; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0f1115; --card: #171a21; --text: #e6e8ee; --muted: #98a2b3; --line: #262b36; --accent: #818cf8; --mine: #1e2340; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+    .app { max-width: 880px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; grid-template-columns: 1fr 220px; grid-template-rows: auto 1fr; height: 100vh; }
+    header { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; }
+    h1 { font-size: 18px; margin: 0; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+    .chat { display: flex; flex-direction: column; min-height: 0; }
+    .log { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+    .msg { max-width: 80%; padding: 8px 12px; border-radius: 12px; background: var(--bg); }
+    .msg.mine { align-self: flex-end; background: var(--mine); }
+    .msg b { display: block; font-size: 12px; color: var(--muted); font-weight: 600; }
+    form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+    input { flex: 1; font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+    button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
+    .members { padding: 12px 16px; align-self: start; }
+    .members h2 { font-size: 13px; margin: 0 0 8px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .members ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+    .members li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #12b76a; display: inline-block; margin-right: 8px; }
+    .wave { background: transparent; color: var(--accent); padding: 2px 6px; font-size: 18px; line-height: 1; }
+    .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; }
+    .toast.show { opacity: 1; }
+    @media (max-width: 640px) { .app { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; } .members { order: 1; } .chat { order: 2; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div><h1># lobby</h1><div class="muted" id="status">Connecting…</div></div>
+      <div class="muted" id="me"></div>
+    </header>
+    <section class="card chat">
+      <div class="log" id="log" aria-live="polite"></div>
+      <form id="send">
+        <input id="text" autocomplete="off" placeholder="Message #lobby" aria-label="Message" maxlength="500">
+        <button>Send</button>
+      </form>
+    </section>
+    <aside class="card members">
+      <h2>Online</h2>
+      <ul id="members"></ul>
+    </aside>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/pusher-js@8.4.0/dist/web/pusher.min.js"></script>
+  <script>
+    const room = 'lobby';
+    const $ = (id) => document.getElementById(id);
+    // Spring Security's SPA CSRF setup: send the XSRF-TOKEN cookie back as a header.
+    const csrf = () => decodeURIComponent((document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/) || [])[1] || '');
+    const post = (url, body) => fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': csrf() },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+
+    (async () => {
+      await fetch('/hibira/inbox/token'); // any GET makes Spring Security set the XSRF-TOKEN cookie
+      const me = await (await fetch('/me')).json();
+      $('me').textContent = 'Signed in as ' + me.name;
+
+      const pusher = new Pusher(me.hibira.key, {
+        wsHost: me.hibira.host, wsPort: me.hibira.port, wssPort: me.hibira.port,
+        forceTLS: me.hibira.tls, enabledTransports: ['ws', 'wss'], cluster: '',
+        channelAuthorization: { endpoint: '/hibira/auth', headers: { 'X-XSRF-TOKEN': csrf() } },
+        userAuthentication: { endpoint: '/hibira/user-auth', headers: { 'X-XSRF-TOKEN': csrf() } },
+      });
+      pusher.connection.bind('state_change', ({ current }) => { $('status').textContent = current === 'connected' ? 'Live' : current; });
+      pusher.signin();
+      pusher.user.bind('wave', (d) => toast(d.from + ' waved at you 👋'));
+
+      const channel = pusher.subscribe('presence-chat.' + room);
+      const renderMembers = () => {
+        const ul = $('members');
+        ul.replaceChildren();
+        channel.members.each((m) => {
+          const li = document.createElement('li');
+          const name = document.createElement('span');
+          name.innerHTML = '<span class="dot"></span>';
+          name.append(m.info.name + (m.id === me.id ? ' (you)' : ''));
+          li.append(name);
+          if (m.id !== me.id) {
+            const b = document.createElement('button');
+            b.className = 'wave'; b.textContent = '👋'; b.title = 'Wave at ' + m.info.name; b.setAttribute('aria-label', b.title);
+            b.onclick = () => post('/wave/' + encodeURIComponent(m.id));
+            li.append(b);
+          }
+          ul.append(li);
+        });
+      };
+      channel.bind('pusher:subscription_succeeded', renderMembers);
+      channel.bind('pusher:member_added', renderMembers);
+      channel.bind('pusher:member_removed', renderMembers);
+      channel.bind('message', (m) => {
+        const div = document.createElement('div');
+        div.className = 'msg' + (m.user === me.id ? ' mine' : '');
+        const who = document.createElement('b');
+        who.textContent = m.user.charAt(0).toUpperCase() + m.user.slice(1);
+        div.append(who, m.text);
+        $('log').append(div);
+        $('log').scrollTop = $('log').scrollHeight;
+      });
+
+      $('send').onsubmit = async (e) => {
+        e.preventDefault();
+        const text = $('text').value.trim();
+        if (!text) return;
+        $('text').value = '';
+        await post('/messages', { room, text });
+      };
+    })();
+
+    function toast(text) {
+      const t = $('toast');
+      t.textContent = text;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2500);
+    }
+  </script>
+</body>
+</html>
