@@ -1,0 +1,62 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Java ${{ matrix.java }} / Spring Boot ${{ matrix.boot }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { java: "17", boot: "3.5.16" }
+          - { java: "21", boot: "4.1.2" }
+          - { java: "25", boot: "4.1.2" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+      - run: mvn -B -ntp -Dspring-boot.version=${{ matrix.boot }} install
+      - name: Sample app builds
+        run: mvn -B -ntp -f samples/chat/pom.xml -Dhibira.version=0.1.0-SNAPSHOT package -DskipTests
+
+  javadoc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+      - name: Release build without signing (sources, javadoc)
+        run: mvn -B -ntp -Prelease -Dgpg.skip -DskipTests verify
+
+  # Runs the API checks against a real Hibira app when the repository has
+  # E2E_APP_ID / E2E_KEY / E2E_SECRET secrets (skipped otherwise).
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      HIBIRA_E2E_APP_ID: ${{ secrets.E2E_APP_ID }}
+      HIBIRA_E2E_KEY: ${{ secrets.E2E_KEY }}
+      HIBIRA_E2E_SECRET: ${{ secrets.E2E_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+        if: env.HIBIRA_E2E_SECRET != ''
+      - uses: actions/setup-java@v4
+        if: env.HIBIRA_E2E_SECRET != ''
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - if: env.HIBIRA_E2E_SECRET != ''
+        run: mvn -B -ntp -pl hibira-java test -Dtest=HibiraLiveTest -Dsurefire.failIfNoSpecifiedTests=false
