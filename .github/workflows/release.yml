@@ -3,8 +3,8 @@ name: release
 # Maven Central when a v* tag is pushed (for example by creating a GitHub
 # release v0.1.0). The version comes from the tag.
 #
-# Repository secrets (Settings → Secrets and variables → Actions):
-#   CENTRAL_TOKEN_USERNAME / CENTRAL_TOKEN_PASSWORD  user token from central.sonatype.com → View Account → Generate User Token
+# Secrets and variables (org or repo: Settings → Secrets and variables → Actions):
+#   vars.CENTRAL_TOKEN_USERNAME / secrets.CENTRAL_TOKEN_PASSWORD  user token from central.sonatype.com → View Account → Generate User Token (org or repo level)
 #   GPG_PRIVATE_KEY / GPG_PASSPHRASE                 an armored private key whose public key is on keys.openpgp.org
 on:
   push:
@@ -33,6 +33,6 @@ jobs:
       - name: Test, sign and publish
         run: mvn -B -ntp -Prelease -Drevision=$VERSION deploy
         env:
-          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_USERNAME: ${{ vars.CENTRAL_TOKEN_USERNAME }}
           CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
