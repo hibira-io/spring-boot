@@ -1,0 +1,45 @@
+name: signing-check
+# Run by hand (Actions → signing-check → Run workflow) to confirm the release
+# secrets work without anyone reading them: the org secrets reach this repo,
+# GPG_PASSPHRASE unlocks GPG_PRIVATE_KEY, and the public key is on
+# keys.openpgp.org where Maven Central looks it up.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secrets and variables are visible
+        env:
+          CENTRAL_TOKEN_USERNAME: ${{ vars.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          missing=0
+          for name in CENTRAL_TOKEN_USERNAME CENTRAL_TOKEN_PASSWORD GPG_PRIVATE_KEY GPG_PASSPHRASE; do
+            if [ -z "${!name}" ]; then echo "::error::$name is empty or not shared with this repository"; missing=1; else echo "$name: set"; fi
+          done
+          exit $missing
+
+      - name: Check the passphrase unlocks the key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          export GNUPGHOME="$(mktemp -d)"
+          printf '%s\n' "$GPG_PRIVATE_KEY" | gpg --batch --import 2>/dev/null
+          fpr="$(gpg --batch --with-colons --list-secret-keys | awk -F: '/^fpr:/ {print $10; exit}')"
+          if [ -z "$fpr" ]; then echo "::error::GPG_PRIVATE_KEY is not an armored private key"; exit 1; fi
+          echo "Key fingerprint: $fpr"
+          if echo check | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 3 --local-user "$fpr" --clearsign 3<<<"$GPG_PASSPHRASE" > /dev/null 2>&1; then
+            echo "Passphrase OK: GPG_PASSPHRASE unlocks the key"
+          else
+            echo "::error::GPG_PASSPHRASE does not unlock GPG_PRIVATE_KEY ($fpr)"; exit 1
+          fi
+          code="$(curl -s -o /dev/null -w '%{http_code}' "https://keys.openpgp.org/vks/v1/by-fingerprint/$fpr")"
+          if [ "$code" = 200 ]; then echo "Public key found on keys.openpgp.org"; else echo "::error::Public key $fpr is not on keys.openpgp.org (HTTP $code)"; exit 1; fi
