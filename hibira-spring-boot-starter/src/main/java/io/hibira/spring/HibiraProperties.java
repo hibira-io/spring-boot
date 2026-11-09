@@ -41,6 +41,8 @@ public class HibiraProperties {
 
     private final Broadcast broadcast = new Broadcast();
 
+    private final WaitingRoom waitingRoom = new WaitingRoom();
+
     public String getAppId() {
         return appId;
     }
@@ -107,6 +109,10 @@ public class HibiraProperties {
 
     public Endpoints getEndpoints() {
         return endpoints;
+    }
+
+    public WaitingRoom getWaitingRoom() {
+        return waitingRoom;
     }
 
     public Broadcast getBroadcast() {
@@ -258,6 +264,54 @@ public class HibiraProperties {
 
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
+        }
+    }
+
+    /** Waiting rooms in front of path prefixes. */
+    public static class WaitingRoom {
+
+        /** Path prefix to room, for example {@code hibira.waiting-room.rooms[/drop]=presale}. The longest prefix wins. */
+        private java.util.Map<String, String> rooms = new java.util.LinkedHashMap<>();
+
+        /** The hosted waiting page origin; unset means the {@code hibira.host}. */
+        private String host;
+
+        /** The waiting page language (en, ja, ko, zh-TW, ...); unset follows the browser. */
+        private String lang;
+
+        /** The previous app secret, still accepted during a secret rotation. */
+        private String previousSecret;
+
+        public java.util.Map<String, String> getRooms() {
+            return rooms;
+        }
+
+        public void setRooms(java.util.Map<String, String> rooms) {
+            this.rooms = rooms;
+        }
+
+        public String getHost() {
+            return host;
+        }
+
+        public void setHost(String host) {
+            this.host = host;
+        }
+
+        public String getLang() {
+            return lang;
+        }
+
+        public void setLang(String lang) {
+            this.lang = lang;
+        }
+
+        public String getPreviousSecret() {
+            return previousSecret;
+        }
+
+        public void setPreviousSecret(String previousSecret) {
+            this.previousSecret = previousSecret;
         }
     }
 }

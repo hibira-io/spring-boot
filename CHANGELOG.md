@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0
+
+- Waiting rooms. `io.hibira.WaitingRoom` checks the signed pass from the
+  Hibira queue (`verifyPass`) and decides what to do with a request
+  (`decide`). The starter adds a servlet filter and a WebFlux filter for the
+  path prefixes in `hibira.waiting-room.rooms`: visitors without a pass go to
+  the hosted queue page, and the pass is kept in an HttpOnly cookie and
+  exposed as the `hibira.pass` request attribute.
+
 ## 0.1.0
 
 - `io.hibira:hibira-java`: HTTP API client (`trigger`, `triggerBatch`,
