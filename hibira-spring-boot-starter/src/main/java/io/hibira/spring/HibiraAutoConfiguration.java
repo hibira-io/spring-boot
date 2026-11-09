@@ -106,4 +106,32 @@ public class HibiraAutoConfiguration {
             return new HibiraReactiveEndpoints(handler);
         }
     }
+
+    /** Waiting rooms on Spring MVC, when {@code hibira.waiting-room.rooms} is set. */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+    @ConditionalOnClass(name = "jakarta.servlet.http.HttpServletRequest")
+    @ConditionalOnProperty(prefix = "hibira.waiting-room", name = "enabled", havingValue = "true", matchIfMissing = true)
+    static class ServletWaitingRoomConfiguration {
+
+        @Bean
+        @ConditionalOnMissingBean
+        HibiraWaitingRoomServletFilter hibiraWaitingRoomFilter(HibiraProperties properties) {
+            return new HibiraWaitingRoomServletFilter(new HibiraWaitingRooms(properties));
+        }
+    }
+
+    /** Waiting rooms on Spring WebFlux, when {@code hibira.waiting-room.rooms} is set. */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.REACTIVE)
+    @ConditionalOnClass(name = "org.springframework.web.server.WebFilter")
+    @ConditionalOnProperty(prefix = "hibira.waiting-room", name = "enabled", havingValue = "true", matchIfMissing = true)
+    static class ReactiveWaitingRoomConfiguration {
+
+        @Bean
+        @ConditionalOnMissingBean
+        HibiraWaitingRoomWebFilter hibiraWaitingRoomWebFilter(HibiraProperties properties) {
+            return new HibiraWaitingRoomWebFilter(new HibiraWaitingRooms(properties));
+        }
+    }
 }

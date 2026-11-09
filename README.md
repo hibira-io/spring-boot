@@ -251,6 +251,36 @@ Approval answer = hibira.awaitApproval(a.approvalId(), Duration.ofMinutes(10));
 if (answer.isApproved()) { /* refund */ }
 ```
 
+## Waiting room
+
+Put a [Hibira waiting room](https://github.com/hibira-io/waiting-room) in front
+of a ticket drop or launch page. Map path prefixes to rooms:
+
+```properties
+hibira.waiting-room.rooms[/drop]=presale
+```
+
+Visitors without a pass are redirected to the hosted queue page (non-GET
+requests get a `403`). When it's their turn they come back with a signed pass,
+which the filter checks and keeps in an HttpOnly cookie. Works on Spring MVC
+and WebFlux. The pass is in the request (or exchange) attribute
+`hibira.pass`:
+
+```java
+@GetMapping("/drop/{id}")
+String drop(@RequestAttribute("hibira.pass") WaitingRoom.Pass pass) {
+    return "Your number: " + pass.number(); // also ticketId(), expiresAt()
+}
+```
+
+Create the room (rate, start time, `return_urls`) with the
+[waiting rooms API](https://github.com/hibira-io/pusher-server/blob/master/docs/waiting-rooms.md).
+A pass is valid for 30 minutes by default and works in any browser; if each
+queue number may check out once, record `pass.ticketId()` and refuse a repeat.
+Without Spring, `io.hibira.WaitingRoom.verifyPass(token, secret, "presale")`
+checks a pass and `WaitingRoom.decide(...)` makes the same decision as the
+filters.
+
 ## Without Spring
 
 `hibira-java` works on its own:
@@ -288,6 +318,9 @@ server's message.
 | `hibira.endpoints.inbox-token` | `/hibira/inbox/token` | Inbox user token |
 | `hibira.endpoints.push-token` | `/hibira/push/token` | Push token |
 | `hibira.broadcast.enabled` | `true` | Send `@HibiraBroadcast` events |
+| `hibira.waiting-room.rooms[<path>]` | | Waiting room protecting a path prefix |
+| `hibira.waiting-room.host`, `.lang` | `https://<hibira.host>`, browser | Hosted waiting page origin and language |
+| `hibira.waiting-room.previous-secret` | | Also accepted during a secret rotation |
 
 Define your own `Hibira` bean to replace the client (for example a mock in
 tests).
@@ -333,3 +366,5 @@ Webhook 驗證後以 `WebhookEvent` 應用事件發布（用 `@EventListener` �
 通知中心（inbox）、推播與人工審核（approvals）。支援 Spring Boot 3 與 4、
 Spring MVC 與 WebFlux、Java 17 以上；不使用 Spring 時可單獨使用
 `hibira-java`。前端用 pusher-js 或 Laravel Echo 連線即可。
+等候室（waiting room）：設定 `hibira.waiting-room.rooms[/drop]=presale`，沒有 pass 的訪客會被導到 Hibira
+託管的排隊頁，輪到時帶著簽名 pass 回來並存成 HttpOnly cookie（Spring MVC 與 WebFlux 皆可）。
