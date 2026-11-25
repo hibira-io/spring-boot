@@ -1,8 +1,10 @@
 package io.hibira;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -148,6 +150,102 @@ public interface Hibira {
             throw new IllegalArgumentException("inbox tokens live at most 30 days");
         }
         return HibiraTokens.sign(options().secret(), userId, Instant.now().plus(ttl), null);
+    }
+
+    // ---- Chat API (https://hibira.io/chat-api) ------------------------------
+
+    /**
+     * Any Chat API call, signed. {@code path} is relative to /apps/APP_ID/chat,
+     * such as {@code /conversations/c1/typing}; {@code body} is sent as JSON
+     * (or null). Returns the JSON answer.
+     */
+    default JsonNode chat(String method, String path, Map<String, String> query, Object body) {
+        throw new UnsupportedOperationException("this Hibira implementation has no Chat API");
+    }
+
+    /**
+     * Creates or replaces a conversation. {@code fields} takes name, members
+     * (user IDs; leave out to keep them), metadata, roles and watchers.
+     */
+    default JsonNode putConversation(String conversationId, Map<String, ?> fields) {
+        return chat("PUT", "/conversations/" + HibiraChannels.pathSegment(conversationId), null, fields == null ? Map.of() : fields);
+    }
+
+    default JsonNode getConversation(String conversationId) {
+        return chat("GET", "/conversations/" + HibiraChannels.pathSegment(conversationId), null, null);
+    }
+
+    /** Deletes a conversation with its members, messages and files. */
+    default JsonNode deleteConversation(String conversationId) {
+        return chat("DELETE", "/conversations/" + HibiraChannels.pathSegment(conversationId), null, null);
+    }
+
+    default JsonNode addMembers(String conversationId, List<String> userIds) {
+        return chat("POST", "/conversations/" + HibiraChannels.pathSegment(conversationId) + "/members", null, Map.of("user_ids", userIds));
+    }
+
+    default JsonNode removeMember(String conversationId, String userId) {
+        return chat("DELETE", "/conversations/" + HibiraChannels.pathSegment(conversationId) + "/members/" + HibiraChannels.pathSegment(userId), null, null);
+    }
+
+    /** Posts a message as a member; offline members get a push (Hibira Push). */
+    default JsonNode sendMessage(String conversationId, String userId, String text) {
+        return sendMessage(conversationId, userId, text, Map.of());
+    }
+
+    /**
+     * Posts a message as a member. {@code extra} takes name, metadata, push
+     * ("offline", "always", "never"), push_title, push_url, visible_to and
+     * idempotency_key.
+     */
+    default JsonNode sendMessage(String conversationId, String userId, String text, Map<String, ?> extra) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("user_id", userId);
+        if (text != null) {
+            body.put("text", text);
+        }
+        if (extra != null) {
+            body.putAll(extra);
+        }
+        return chat("POST", "/conversations/" + HibiraChannels.pathSegment(conversationId) + "/messages", null, body);
+    }
+
+    /** Messages oldest first after a seq (0 for the start), at most {@code limit} (0 for the default). */
+    default JsonNode listMessages(String conversationId, long after, int limit) {
+        Map<String, String> q = new LinkedHashMap<>();
+        if (after > 0) {
+            q.put("after", Long.toString(after));
+        }
+        if (limit > 0) {
+            q.put("limit", Integer.toString(limit));
+        }
+        return chat("GET", "/conversations/" + HibiraChannels.pathSegment(conversationId) + "/messages", q, null);
+    }
+
+    default JsonNode markRead(String conversationId, String userId, long seq) {
+        return chat("POST", "/conversations/" + HibiraChannels.pathSegment(conversationId) + "/read", null, Map.of("user_id", userId, "seq", seq));
+    }
+
+    /** A message with no sender, such as "Alice joined". */
+    default JsonNode systemMessage(String conversationId, String text, Map<String, ?> metadata) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("text", text);
+        if (metadata != null) {
+            body.put("metadata", metadata);
+        }
+        return chat("POST", "/conversations/" + HibiraChannels.pathSegment(conversationId) + "/system", null, body);
+    }
+
+    /** A user's conversations, latest activity first, each with its unread count. */
+    default JsonNode userConversations(String userId, int limit, String before) {
+        Map<String, String> q = new LinkedHashMap<>();
+        if (limit > 0) {
+            q.put("limit", Integer.toString(limit));
+        }
+        if (before != null && !before.isEmpty()) {
+            q.put("before", before);
+        }
+        return chat("GET", "/users/" + HibiraChannels.pathSegment(userId) + "/conversations", q, null);
     }
 
     // ---- Push notifications (needs the push instance ID and secret key) -----

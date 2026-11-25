@@ -381,4 +381,58 @@ class HibiraClientTest {
             assertThat(q.get("body_md5")).isEqualTo(HibiraSignature.md5(r.body().getBytes(StandardCharsets.UTF_8)));
         }
     }
+
+    @Test
+    void callsTheChatApi() throws IOException {
+        answer = r -> new Object[] {200, "{\"ok\":true}"};
+        HibiraClient c = client();
+        JsonNode out = c.putConversation("order 42", Map.of("name", "Order", "members", List.of("u1", "agent")));
+        assertThat(out.get("ok").asBoolean()).isTrue();
+        c.sendMessage("order 42", "u1", "Hi", Map.of("push", "always"));
+        c.listMessages("order 42", 10, 50);
+        c.getConversation("c1");
+        c.addMembers("c1", List.of("u2"));
+        c.removeMember("c1", "u/2");
+        c.markRead("c1", "u1", 12);
+        c.systemMessage("c1", "Alice joined", null);
+        c.userConversations("u1", 20, null);
+        c.deleteConversation("c1");
+        c.chat("post", "/conversations/c1/typing", null, Map.of("user_id", "u1"));
+        assertThat(requests).extracting(r -> r.method() + " " + r.path()).containsExactly(
+                "PUT /apps/3/chat/conversations/order%2042",
+                "POST /apps/3/chat/conversations/order%2042/messages",
+                "GET /apps/3/chat/conversations/order%2042/messages",
+                "GET /apps/3/chat/conversations/c1",
+                "POST /apps/3/chat/conversations/c1/members",
+                "DELETE /apps/3/chat/conversations/c1/members/u%2F2",
+                "POST /apps/3/chat/conversations/c1/read",
+                "POST /apps/3/chat/conversations/c1/system",
+                "GET /apps/3/chat/users/u1/conversations",
+                "DELETE /apps/3/chat/conversations/c1",
+                "POST /apps/3/chat/conversations/c1/typing");
+        JsonNode msg = requests.get(1).json();
+        assertThat(msg.get("user_id").asText()).isEqualTo("u1");
+        assertThat(msg.get("text").asText()).isEqualTo("Hi");
+        assertThat(msg.get("push").asText()).isEqualTo("always");
+        assertThat(requests.get(2).query()).containsEntry("after", "10").containsEntry("limit", "50");
+        assertThat(requests.get(6).json().get("seq").asLong()).isEqualTo(12);
+        assertThat(requests.get(0).query()).containsKeys("auth_signature", "body_md5");
+        String sorted = new TreeMap<>(requests.get(3).query()).entrySet().stream()
+                .filter(e -> !e.getKey().equals("auth_signature"))
+                .map(e -> e.getKey() + "=" + e.getValue()).reduce((a, b) -> a + "&" + b).orElse("");
+        assertThat(requests.get(3).query().get("auth_signature"))
+                .isEqualTo(HibiraSignature.hmac(SECRET, "GET\n/apps/3/chat/conversations/c1\n" + sorted));
+        assertThatThrownBy(() -> c.getConversation("")).isInstanceOf(IllegalArgumentException.class);
+
+        answer = r -> new Object[] {404, "{\"error\":\"conversation not found\"}"};
+        assertThatThrownBy(() -> c.getConversation("nope")).isInstanceOf(HibiraException.class).hasMessageContaining("not found");
+    }
+
+    @Test
+    void signsLiveChatVisitors() {
+        assertThat(LiveChat.userHash("lcid_s", "42")).isEqualTo(HibiraSignature.hmac("lcid_s", "42"));
+        assertThat(LiveChat.identity("lcid_s", "42", "Ann", null))
+                .containsEntry("id", "42").containsEntry("name", "Ann").doesNotContainKey("email");
+        assertThatThrownBy(() -> LiveChat.userHash("", "1")).isInstanceOf(IllegalArgumentException.class);
+    }
 }
