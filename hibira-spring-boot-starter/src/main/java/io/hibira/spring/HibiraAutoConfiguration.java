@@ -50,6 +50,13 @@ public class HibiraAutoConfiguration {
     }
 
     /** The {@link HibiraChannel} methods. */
+    /** Hibira Live Chat's widget tag and verified visitors, from {@code hibira.live-chat.*}. */
+    @Bean
+    @ConditionalOnMissingBean
+    public HibiraLiveChat hibiraLiveChat(HibiraProperties p) {
+        return new HibiraLiveChat(p.getLiveChat().getWorkspace(), p.getLiveChat().getIdentitySecret());
+    }
+
     @Bean
     @ConditionalOnMissingBean
     public static HibiraChannelRegistry hibiraChannelRegistry(ConfigurableListableBeanFactory beanFactory) {

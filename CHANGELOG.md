@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Chat API on `Hibira`: `putConversation`, `getConversation`, `deleteConversation`, `addMembers`, `removeMember`, `sendMessage`, `listMessages`, `markRead`, `systemMessage`, `userConversations`, and `chat(method, path, query, body)` for any other call.
+- Live Chat: `io.hibira.LiveChat.userHash` / `identity` for verified visitors; the starter adds a `HibiraLiveChat` bean (`hibira.live-chat.workspace`, `hibira.live-chat.identity-secret`) whose `scriptTag(...)` renders the widget.
+
 ## 0.2.0
 
 - Waiting rooms. `io.hibira.WaitingRoom` checks the signed pass from the

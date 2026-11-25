@@ -69,4 +69,12 @@ public final class HibiraChannels {
         }
         return channel;
     }
+
+    /** A non-empty ID, percent-encoded for one URL path segment. */
+    public static String pathSegment(String id) {
+        if (id == null || id.isEmpty()) {
+            throw new IllegalArgumentException("an ID is required");
+        }
+        return java.net.URLEncoder.encode(id, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");
+    }
 }

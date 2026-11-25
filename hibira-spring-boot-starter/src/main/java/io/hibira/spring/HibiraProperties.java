@@ -43,6 +43,8 @@ public class HibiraProperties {
 
     private final WaitingRoom waitingRoom = new WaitingRoom();
 
+    private final LiveChat liveChat = new LiveChat();
+
     public String getAppId() {
         return appId;
     }
@@ -117,6 +119,36 @@ public class HibiraProperties {
 
     public Broadcast getBroadcast() {
         return broadcast;
+    }
+
+    public LiveChat getLiveChat() {
+        return liveChat;
+    }
+
+    /** Hibira Live Chat (chat.hibira.io): the widget and verified visitors. */
+    public static class LiveChat {
+
+        /** The workspace ID, from Live Chat › Settings › Widget. */
+        private String workspace;
+
+        /** The Verified visitors identity secret: signs the signed-in user so they chat as themselves. */
+        private String identitySecret;
+
+        public String getWorkspace() {
+            return workspace;
+        }
+
+        public void setWorkspace(String workspace) {
+            this.workspace = workspace;
+        }
+
+        public String getIdentitySecret() {
+            return identitySecret;
+        }
+
+        public void setIdentitySecret(String identitySecret) {
+            this.identitySecret = identitySecret;
+        }
     }
 
     /** Hibira Push (app page, Push notifications). */

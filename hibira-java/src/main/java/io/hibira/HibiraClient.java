@@ -312,6 +312,23 @@ public final class HibiraClient implements Hibira {
         return read(send("DELETE", "inbox/users/" + userId + "/notifications", null, null), InboxChange.class);
     }
 
+    // ---- Chat API -----------------------------------------------------------
+
+    @Override
+    public JsonNode chat(String method, String path, Map<String, String> query, Object body) {
+        requireText(method, "method");
+        if (path == null || !path.startsWith("/")) {
+            throw new IllegalArgumentException("path must start with \"/\", such as /conversations/support-42");
+        }
+        String text = send(method.toUpperCase(java.util.Locale.ROOT), "chat" + path,
+                query == null || query.isEmpty() ? null : query, body == null ? null : json.valueToTree(body));
+        try {
+            return text.isEmpty() ? json.createObjectNode() : json.readTree(text);
+        } catch (IOException e) {
+            throw new HibiraException("Hibira Chat API answered with invalid JSON: " + e.getMessage(), e);
+        }
+    }
+
     // ---- Push ---------------------------------------------------------------
 
     @Override

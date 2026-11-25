@@ -251,6 +251,41 @@ Approval answer = hibira.awaitApproval(a.approvalId(), Duration.ofMinutes(10));
 if (answer.isApproved()) { /* refund */ }
 ```
 
+## Chat API
+
+Conversations with stored history, read receipts and offline push
+([reference](https://hibira.io/chat-api)). Clients receive `chat.*` events on
+`#server-to-user-<user_id>` after `pusher.signin()`.
+
+```java
+hibira.putConversation("order-1042", Map.of("name", "Order #1042", "members", List.of("cust_7", "agent_2")));
+hibira.sendMessage("order-1042", "agent_2", "Your parcel left the warehouse.");
+JsonNode page = hibira.listMessages("order-1042", lastSeq, 50);   // messages, last_seq
+hibira.markRead("order-1042", "cust_7", page.get("last_seq").asLong());
+```
+
+Also `getConversation`, `deleteConversation`, `addMembers`, `removeMember`,
+`systemMessage`, `userConversations`, and `chat(method, path, query, body)` for
+every other call (typing, reactions, edits, search, moderation).
+
+## Live Chat
+
+Put the [Hibira Live Chat](https://chat.hibira.io) widget on your pages, and
+let signed-in users chat as themselves. Set `hibira.live-chat.workspace` (Live
+Chat › Settings › Widget) and, for verified visitors, `hibira.live-chat.identity-secret`.
+Then put the tag from the `HibiraLiveChat` bean in your layout:
+
+```java
+model.addAttribute("liveChat", liveChat.scriptTag(user.getId(), user.getName(), user.getEmail()));
+// Thymeleaf, before </body>: <th:block th:utext="${liveChat}"></th:block>
+```
+
+The user's ID is signed with HMAC-SHA256, so the inbox shows their name and
+email and nobody can pretend to be them. `liveChat.scriptTag()` is for
+visitors who are not signed in; `liveChat.identity(...)` gives the fields for
+`HibiraLiveChat.identify()` in an SPA, and `io.hibira.LiveChat.userHash` works
+without Spring.
+
 ## Waiting room
 
 Put a [Hibira waiting room](https://github.com/hibira-io/waiting-room) in front
@@ -321,6 +356,7 @@ server's message.
 | `hibira.waiting-room.rooms[<path>]` | | Waiting room protecting a path prefix |
 | `hibira.waiting-room.host`, `.lang` | `https://<hibira.host>`, browser | Hosted waiting page origin and language |
 | `hibira.waiting-room.previous-secret` | | Also accepted during a secret rotation |
+| `hibira.live-chat.workspace`, `hibira.live-chat.identity-secret` | | Live Chat widget and verified visitors |
 
 Define your own `Hibira` bean to replace the client (for example a mock in
 tests).
@@ -368,3 +404,4 @@ Spring MVC 與 WebFlux、Java 17 以上；不使用 Spring 時可單獨使用
 `hibira-java`。前端用 pusher-js 或 Laravel Echo 連線即可。
 等候室（waiting room）：設定 `hibira.waiting-room.rooms[/drop]=presale`，沒有 pass 的訪客會被導到 Hibira
 託管的排隊頁，輪到時帶著簽名 pass 回來並存成 HttpOnly cookie（Spring MVC 與 WebFlux 皆可）。
+Chat API：`putConversation`、`sendMessage`、`listMessages`、`markRead` 等方法。Live Chat：`HibiraLiveChat.scriptTag(...)` 產生聊天視窗標籤，設定 identity secret 後登入使用者以 HMAC 簽名的本人身分聊天。

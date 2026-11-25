@@ -38,6 +38,25 @@ class HibiraAutoConfigurationTest {
     }
 
     @Test
+    void rendersTheLiveChatWidgetWithVerifiedVisitors() {
+        runner.withPropertyValues(CREDENTIALS).run(ctx -> assertThat(ctx.getBean(HibiraLiveChat.class).scriptTag()).isEmpty());
+        runner.withPropertyValues(CREDENTIALS)
+                .withPropertyValues("hibira.live-chat.workspace=ws_1", "hibira.live-chat.identity-secret=lcid_s")
+                .run(ctx -> {
+                    HibiraLiveChat chat = ctx.getBean(HibiraLiveChat.class);
+                    assertThat(chat.scriptTag()).isEqualTo("<script src=\"https://chat.hibira.io/w/v1.js\" data-workspace=\"ws_1\" async></script>");
+                    String hash = io.hibira.LiveChat.userHash("lcid_s", "7");
+                    assertThat(chat.scriptTag("7", "Aiko \"A\" <B>", "aiko@example.com")).isEqualTo(
+                            "<script src=\"https://chat.hibira.io/w/v1.js\" data-workspace=\"ws_1\" data-user-id=\"7\" data-user-hash=\""
+                                    + hash + "\" data-user-name=\"Aiko &quot;A&quot; &lt;B&gt;\" data-user-email=\"aiko@example.com\" async></script>");
+                    assertThat(chat.identity("7", null, null)).containsEntry("hash", hash);
+                    assertThat(chat.identity(null, null, null)).isNull();
+                });
+        runner.withPropertyValues(CREDENTIALS).withPropertyValues("hibira.live-chat.workspace=ws_1")
+                .run(ctx -> assertThat(ctx.getBean(HibiraLiveChat.class).scriptTag("7", "A", null)).doesNotContain("data-user-id"));
+    }
+
+    @Test
     void failsClearlyWithoutCredentials() {
         runner.run(ctx -> assertThat(ctx).hasFailed().getFailure().rootCause().hasMessageContaining("hibira.app-id"));
     }
