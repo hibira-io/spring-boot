@@ -364,7 +364,9 @@ public final class HibiraClient implements Hibira {
     private String send(String method, String resource, Map<String, String> query, JsonNode body) {
         String path = "/apps/" + options.appId() + "/" + resource;
         byte[] bytes = body == null ? null : write(body).getBytes(StandardCharsets.UTF_8);
-        String qs = HibiraSignature.signedQuery(options.key(), options.secret(), method, path, query, bytes, clock.instant());
+        // The server signs the decoded path (order%2042 is checked as "order 42").
+        String signedPath = URI.create(path).getPath();
+        String qs = HibiraSignature.signedQuery(options.key(), options.secret(), method, signedPath, query, bytes, clock.instant());
         HttpRequest.Builder req = HttpRequest.newBuilder(URI.create(options.baseUri() + path + "?" + qs))
                 .timeout(options.timeout())
                 .header("User-Agent", "hibira-java/" + VERSION);

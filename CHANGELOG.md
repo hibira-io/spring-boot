@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix: requests whose path holds an encoded character (a Chat API conversation or user ID with a space or `/`, for example) are now signed over the decoded path, as the server checks them. Before, such calls answered 401.
+
 ## 0.3.0
 
 - Chat API on `Hibira`: `putConversation`, `getConversation`, `deleteConversation`, `addMembers`, `removeMember`, `sendMessage`, `listMessages`, `markRead`, `systemMessage`, `userConversations`, and `chat(method, path, query, body)` for any other call.
