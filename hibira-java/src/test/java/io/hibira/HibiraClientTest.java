@@ -422,6 +422,12 @@ class HibiraClientTest {
                 .map(e -> e.getKey() + "=" + e.getValue()).reduce((a, b) -> a + "&" + b).orElse("");
         assertThat(requests.get(3).query().get("auth_signature"))
                 .isEqualTo(HibiraSignature.hmac(SECRET, "GET\n/apps/3/chat/conversations/c1\n" + sorted));
+        String sortedPut = new TreeMap<>(requests.get(0).query()).entrySet().stream()
+                .filter(e -> !e.getKey().equals("auth_signature"))
+                .map(e -> e.getKey() + "=" + e.getValue()).reduce((a, b) -> a + "&" + b).orElse("");
+        assertThat(requests.get(0).query().get("auth_signature"))
+                .as("the server checks the decoded path")
+                .isEqualTo(HibiraSignature.hmac(SECRET, "PUT\n/apps/3/chat/conversations/order 42\n" + sortedPut));
         assertThatThrownBy(() -> c.getConversation("")).isInstanceOf(IllegalArgumentException.class);
 
         answer = r -> new Object[] {404, "{\"error\":\"conversation not found\"}"};
