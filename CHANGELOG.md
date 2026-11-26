@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.1
 
 - Fix: requests whose path holds an encoded character (a Chat API conversation or user ID with a space or `/`, for example) are now signed over the decoded path, as the server checks them. Before, such calls answered 401.
 
